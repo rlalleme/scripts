@@ -1,0 +1,76 @@
+#! /bin/bash
+
+#Prints the usage
+function print_usage(){
+	echo "Usage: ${BASH_SOURCE[0]} <tempalte> [<output>]"
+	echo "  Create a file from one of the templates located in ~/.templates"
+	echo
+	echo "Valid parameters:"
+	echo "  tempalte    Name of the tempalte to use (see bellow for a list of existing tempaltes"
+	echo "  output      Path where to create the new file, default is \".\""
+	echo
+	echo "Existing templates:"
+	
+	find "${HOME}/Templates" -type f | sort | sed 's|.*Templates/\(.*\)| \x27\1\x27|'
+}
+
+#Check that the correct number of argument was given
+if [ "$#" -ne "1" -a "$#" -ne "2" ]
+then
+	echo "ERROR: Invalid number of parameters"
+	echo
+	print_usage
+	exit 99
+fi
+
+#Declare the positionnal parameters
+positionnal=(TEMPLATE OUTPUT_DIR)
+pos="0"
+
+#Retrieve the parameters
+for arg
+do
+	case "$arg" in
+		-h|--help) print_usage
+			exit 0
+			;;
+		*) typeset ${positionnal[pos]}="$arg"
+			pos=$((pos+1))
+			;;
+	esac
+done
+
+#If the output dir was not 
+if [ -z "$OUTPUT_DIR" ]
+then
+	OUTPUT_DIR="."
+fi
+
+#Check that the tempalte exist and is valid
+if [ ! -f "${HOME}/Templates/$TEMPLATE" ]
+then
+	echo "ERROR: Invalid template file, \"${HOME}/Templates/$TEMPLATE\" does not exist (see ${BASH_SOURCE[0]} -h to get a list of possible templates)."
+	exit 98
+fi
+
+#Check that the output directory is writable
+#First check if the string ends with a "."
+if [ "${OUTPUT_DIR:(-1)}" = "." ]
+then
+	if [ ! -w ${OUTPUT_DIR::(-1)} ]
+	then
+		echo "ERROR: The location \"${OUTPUT_DIR::(-1)}\" is not writable"
+		exit 97
+	fi
+else
+	#Since the path contains the file name, strip it and then verify that it is allowed
+	DIR=$(readlink -m "$OUTPUT_DIR" | xargs dirname)
+	if [ ! -w "$DIR" ]
+	then
+		echo "ERROR: The location \"${OUTPUT_DIR}\" is not writable"
+		exit 97
+	fi
+fi
+
+#Finally copy the template to the new location
+cp "${HOME}/Templates/${TEMPLATE}" "${OUTPUT_DIR}"
