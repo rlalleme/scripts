@@ -1,0 +1,54 @@
+#! /bin/bash
+
+if [ ! $# == 2 -a ! $# == 1 ]
+then
+	echo "ERROR: Invalid number of parameters."
+	echo
+	echo "Usage : pdftobooklet input.pdf output.pdf"
+	exit 99
+fi
+
+if [ "$1" == "--help" -o "$1" == "-h" -o "$2" == "--help" -o "$2" == "-h" ]
+then
+	echo "Usage : pdftobooklet input.pdf output.pdf"
+	exit 0
+fi
+
+if [ -f "$1" ]
+then
+	if ! file $1 | grep -q PDF
+	then
+		echo "Input file have to be a PDF"
+		exit 0
+	fi
+else
+	echo "File $1 does not exist"
+	exit 0
+fi
+
+if ! echo "$2" | grep -q .pdf$
+then
+	echo "Warning : output file does not end with PDF extension"
+	echo "Continue [Y/n] ?"
+	while [[ "$CONTINUE" != "Y" ]] && [[ "$CONTINUE" != "y" ]]
+	do
+		read CONTINUE
+		if [[ "$CONTINUE" == "n" ]] || [[ "$CONTINUE" == "N" ]]
+		then
+			exit 0
+		else if [[ "$CONTINUE" != "Y" ]] && [[ "$CONTINUE" != "y" ]]
+		then
+			echo "Invalid answer."
+			echo "Continue without PDF extension [Y/n] ?"
+		fi
+		fi
+	done
+fi
+
+TEMP=`mktemp --suffix=.ps`
+
+pdf2ps $1 $TEMP
+
+psbook $TEMP | psnup -2 -Pa4 -pa4 | ps2pdf - $2
+
+exit 0

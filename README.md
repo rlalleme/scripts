@@ -35,4 +35,5 @@ All the scripts return `0` when successfull, and any other value if failed (most
 List of scripts
 ---------------
 
- - [template](https://github.com/rlalleme/scripts/wiki/template) : Create a file from a template located in `~/Templates`
+ - [pdftobooklet](/pdftobooklet): Transforms pdf files into pdf booklet, you then can print the pdf into a booklet by using two-sided, short-edge flipping print option.
+ - [template](https://github.com/rlalleme/scripts/wiki/template): Creates a file from a template located in `~/Templates`
