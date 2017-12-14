@@ -1,0 +1,307 @@
+#!/bin/bash
+#
+# Move the current window to the next monitor.
+#
+# Works only on one X screen (which is the most common case).
+#
+#TODO Fix the problem when the two screen do not share any size
+#TODO Scale the window to keep its geometry relative to the screen
+#TODO Works only for XFCE when the Panel is at the top fixed both limitations
+
+#POSSIBLES MODES
+# MODE OFFSET
+# MODE="offset"
+#In this ,ode the window is simply moved from a screen to another by applying an offset
+
+#MODE PROPORTIONNAL
+# MODE="proportionnal"
+#In this mode the window is moved so that its position is proportionnal to the screen dimension
+
+#MODE RESIZE
+MODE="resize"
+#In the mode the window is moved like in proportionnal mode, but additonnaly it is resized to keep a proportion of its size
+
+echo >> /tmp/test-F1
+echo >> /tmp/test-F1
+echo "--------" >> /tmp/test-F1
+
+set -e
+
+xrandr > /tmp/xrandr_status
+
+# cat /tmp/xrandr_status >> /tmp/test-F1
+
+if [ `cat /tmp/xrandr_status | fgrep "*" | wc -l` -eq "1" ]
+then
+	#Only one screen is ON, so drop to the default action of centering
+	MODE="center"
+fi
+
+if [ `cat /tmp/xrandr_status | fgrep "*" | wc -l` -gt "2" ]
+then
+	# echo "More than two screen is not yet supported" >> /tmp/test-F1
+	exit 0
+fi
+
+window_id=`xdotool getactivewindow`
+
+# echo "Window id: $window_id" >> /tmp/test-F1
+
+x_offset=`cat /tmp/xrandr_status | grep -w connected | grep -v "+0+0" | egrep -o "[0-9]+x[0-9]+\+[0-9]+\+[0-9]+" | cut -f 2 -d'+'`
+y_offset=`cat /tmp/xrandr_status | grep -w connected | grep -v "+0+0" | egrep -o "[0-9]+x[0-9]+\+[0-9]+\+[0-9]+" | cut -f 3 -d'+'`
+
+screen_master_width=`cat /tmp/xrandr_status | grep -w connected | grep "+0+0" | egrep -o "[0-9]+x[0-9]+" | cut -f 1 -d 'x'`
+screen_master_height=`cat /tmp/xrandr_status | grep -w connected | grep "+0+0" | egrep -o "[0-9]+x[0-9]+" | cut -f 2 -d 'x'`
+screen_slave_width=`cat /tmp/xrandr_status | grep -w connected | grep -v "+0+0" | egrep -o "[0-9]+x[0-9]+" | cut -f 1 -d 'x'`
+screen_slave_height=`cat /tmp/xrandr_status | grep -w connected | grep -v "+0+0" | egrep -o "[0-9]+x[0-9]+" | cut -f 2 -d 'x'`
+
+echo "Master screen : $screen_master_width $screen_master_height" >> /tmp/test-F1
+echo "Slave screen : $screen_slave_width $screen_slave_height" >> /tmp/test-F1
+
+if [ $x_offset -eq 0 ]
+then
+	mode="vert"
+	offset=$y_offset
+else
+	mode="horz"
+	offset=$x_offset
+fi
+
+# echo "Offset=$offset Mode=$mode" >> /tmp/test-F1
+
+# Remember if it was maximized. (either Vertical, Horizontal or both)
+window_state=`xprop -id $window_id _NET_WM_STATE`
+if echo $window_state | grep -q _NET_WM_STATE_MAXIMIZED_HORZ
+then
+	window_max_horz="true"
+else
+	window_max_horz="false"
+fi
+if echo $window_state | grep -q _NET_WM_STATE_MAXIMIZED_VERT
+then
+	window_max_vert="true"
+else
+	window_max_vert="false"
+fi
+
+# echo "Max horz=$window_max_horz - Max vert=$window_max_vert" >> /tmp/test-F1
+
+# Read window position
+x=`xwininfo -id $window_id | awk '/Absolute upper-left X:/ { print $4 }'`
+y=`xwininfo -id $window_id | awk '/Absolute upper-left Y:/ { print $4 }'`
+width=`xwininfo -id $window_id | awk '/Width:/ { print $2 }'`
+height=`xwininfo -id $window_id | awk '/Height:/ { print $2 }'`
+
+echo "Current Position $x $y" >> /tmp/test-F1
+echo "Current Shape $width $height" >> /tmp/test-F1
+
+# Un-maximize current window so that we can move it
+wmctrl -ir $window_id -b remove,maximized_vert,maximized_horz
+
+# Subtract any offsets caused by panels or window decorations
+x_offset=`xwininfo -id $window_id | awk '/Relative upper-left X:/ { print $4 }'`
+y_offset=`xwininfo -id $window_id | awk '/Relative upper-left Y:/ { print $4 }'`
+
+echo "Window info $x_offset $y_offset" >> /tmp/test-F1
+
+# If the Panel is fixed
+panel_config_file="${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
+if fgrep -q '<property name="autohide-behavior" type="uint" value="0"/>' $panel_config_file
+then
+	# echo "Panel is fixed" >> /tmp/test-F1
+	panel_offset=`fgrep '<property name="size"' $panel_config_file | cut -f 6 -d'"'`
+	panel_offset=$(( $panel_offset + 1 )) #The +1 is a hack ...
+	# echo "Panel offset $panel_offset" >> /tmp/test-F1
+	
+	y_offset="0" #Default value
+	if [[ "$mode" == "horz" ]]
+	then
+		#Horizontal mode
+		if [ "$x" -lt "$offset" ]
+		then
+			#On the master screen
+			y_offset=$(($y_offset + $panel_offset))
+		fi
+	else
+		#Vertical mode
+		if [ "$y" -lt "$offset" ]
+		then
+			#On the master screen
+			y_offset=$(($y_offset + $panel_offset))
+		fi
+	fi
+	
+	if [ "$y" -lt "$y_offset" ]
+	then
+		y_offset=$(($y_offset + $panel_offset))
+	fi
+fi
+
+# echo "Vertical offset $y_offset" >> /tmp/test-F1
+
+screen_master_height=$(( $screen_master_height - $panel_offset ))
+
+x=$(($x - $x_offset))
+y=$(($y - $y_offset))
+
+# echo "Position $x $y" >> /tmp/test-F1
+
+function offset {
+	if [[ "$mode" == "horz" ]]
+	then
+		#Horizontal mode
+		new_y=$y
+		# Compute new X position
+		if [ "$x" -ge "$offset" ]
+		then
+			new_x=$(($x - $offset))
+		else
+			new_x=$(($x + $offset))
+		fi
+	else
+		#Vertical mode
+		new_x=$x
+		# Compute new Y position
+		if [ "$y" -ge "$offset" ]
+		then
+			new_y=$(($y - $offset))
+		else
+			new_y=$(($y + $offset))
+		fi
+	fi
+}
+
+function proportionnal {
+	#Detect the screen config
+	if [[ "$mode" == "horz" ]]
+	then
+		#Horizontal mode
+		if [ "$x" -ge "$offset" ]
+		then
+			#On the slave screen
+			new_x=$(( ( ($x-$offset) * $screen_master_width) / $screen_slave_width))
+			new_y=$(( ( ($y * $screen_master_height) / $screen_slave_height) + $panel_offset ))
+		else
+			#On the master screen
+			new_x=$(( ( ($x * $screen_slave_width) / $screen_master_width) + $offset))
+			new_y=$(( ($y * $screen_slave_height) / $screen_master_height))
+		fi
+	else
+		#Vertical mode
+		if [ "$y" -ge "$offset" ]
+		then
+			#On the slave screen
+			new_x=$(( ($x * $screen_master_width) / $screen_slave_width))
+			new_y=$(( ( ( ($y-$offset) * $screen_master_height) / $screen_slave_height ) + $panel_offset ))
+		else
+			#On the master screen
+			new_x=$(( ($x * $screen_slave_width) / $screen_master_width))
+			new_y=$(( ( ($y * $screen_slave_height) / $screen_master_height) + $offset ))
+		fi
+	fi
+}
+
+function resize {
+	#Detect the screen config
+	if [[ "$mode" == "horz" ]]
+	then
+		#Horizontal mode
+		if [ "$x" -ge "$offset" ]
+		then
+			#On the slave screen
+			new_width=$(( ($width * $screen_master_width) / $screen_slave_width))
+			new_height=$(( ($height * $screen_master_height) / $screen_slave_height))
+		else
+			#On the master screen
+			new_width=$(( ($width * $screen_slave_width) / $screen_master_width))
+			new_height=$(( ($height * $screen_slave_height) / $screen_master_height))
+		fi
+	else
+		#Vertical mode
+		if [ "$y" -ge "$offset" ]
+		then
+			#On the slave screen
+			new_width=$(( ($width * $screen_master_width) / $screen_slave_width))
+			new_height=$(( ($height * $screen_master_height) / $screen_slave_height))
+		else
+			#On the master screen
+			new_width=$(( ($width * $screen_slave_width) / $screen_master_width))
+			new_height=$(( ($height * $screen_slave_height) / $screen_master_height))
+		fi
+	fi
+}
+
+function center {
+	#Compute the new position the get the window centered
+	new_x=$(( ($screen_master_width - $width) / 2 ))
+	new_y=$(( ($screen_master_height - $height) / 2 ))
+}
+
+echo "Mode: $MODE" >> /tmp/test-F1
+
+new_x=$x
+new_y=$y
+
+new_width=$width
+new_height=$height
+
+case $MODE in
+	"offset")
+		offset
+		;;
+	"proportionnal")
+		proportionnal
+		;;
+	"resize")
+		proportionnal
+		resize
+		;;
+	"center")
+		center
+		;;
+	*)
+		# echo "ERROR: Invalid mode \"$MODE\"!" >> /tmp/test-F1
+		exit 98
+		;;
+esac
+
+echo "New Position $new_x $new_y" >> /tmp/test-F1
+echo "New size $new_width $new_height" >> /tmp/test-F1
+
+#Apply "security" to keep at least 10px of the window inside the screen
+#TODO ?
+# if [[ "$window_max_vert" = "false" ]]
+# then
+# 	if [ "$new_x" -lt "- $(($height - 10))" ]
+# 	then
+# 		echo "Under minimum"
+# 		new_x=$(($height - 10))
+# 	fi
+# fi
+# echo "New (secure) Position $new_x $new_y" >> /tmp/test-F1
+
+# Move the window
+xdotool windowmove $window_id $new_x $new_y
+
+#TODO TO REMOVE
+x=`xwininfo -id $window_id | awk '/Absolute upper-left X:/ { print $4 }'`
+y=`xwininfo -id $window_id | awk '/Absolute upper-left Y:/ { print $4 }'`
+echo "Position after move $x $y" >> /tmp/test-F1
+
+# Maximize window again, if it was before
+if [[ "$window_max_horz" == "true" ]] && [[ "$window_max_vert" == "true" ]]
+then
+	# echo "Set maximized vert & horiz" >> /tmp/test-F1
+	wmctrl -ir $window_id -b add,maximized_vert,maximized_horz
+elif [[ "$window_max_horz" == "true" ]]
+then
+	# echo "Set maximized vert" >> /tmp/test-F1
+	wmctrl -ir $window_id -b add,maximized_horz
+elif [[ "$window_max_vert" == "true" ]]
+then
+	# echo "Set maximized horiz" >> /tmp/test-F1
+	wmctrl -ir $window_id -b add,maximized_vert
+else
+# 	echo "Resize window" >> /tmp/test-F1
+	xdotool windowsize $window_id $new_width $new_height
+fi
