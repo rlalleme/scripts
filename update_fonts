@@ -1,0 +1,5 @@
+#! /bin/bash
+
+#The .ttf files are located in ~/.fonts
+
+fc-cache -f -v

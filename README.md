@@ -39,3 +39,4 @@ List of scripts
  - [move-to-next-monitor](https://github.com/rlalleme/scripts/wiki/move-to-next-monitor): Move an X11-compatible window from a screen to another in a multi-display config.
  - [pdftobooklet](/pdftobooklet): Transforms pdf files into pdf booklet, you then can print the pdf into a booklet by using two-sided, short-edge flipping print option.
  - [template](https://github.com/rlalleme/scripts/wiki/template): Creates a file from a template located in `~/Templates`
+ - [update_fonts](/update_fonts): Update the .ttf fonts located in .fonts (to make them visible to Inkscape for instance), not really a script more like a reminder.
