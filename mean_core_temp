@@ -1,0 +1,3 @@
+#! /bin/bash
+
+sensors coretemp-isa-0000 | tr -s ' ' | cut -f 2 -d '+' | egrep -o "[0-9]+\.[0-9]*" | awk 'BEGIN {sum=0; div=0} {sum+=$1; div++} END {mean=sum/div; printf "%2.1f°C", mean}'

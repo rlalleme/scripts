@@ -35,5 +35,6 @@ All the scripts return `0` when successfull, and any other value if failed (most
 List of scripts
 ---------------
 
+ - [mean_core_temp](/mean_core_temp): Computes the mean temperature of all your CPU cores, and displays it in the form `XX.X°C`.
  - [pdftobooklet](/pdftobooklet): Transforms pdf files into pdf booklet, you then can print the pdf into a booklet by using two-sided, short-edge flipping print option.
  - [template](https://github.com/rlalleme/scripts/wiki/template): Creates a file from a template located in `~/Templates`
